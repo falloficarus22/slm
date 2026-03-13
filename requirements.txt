@@ -1,0 +1,10 @@
+torch
+torchvision
+transformers
+datasets
+tokenizers
+accelerate
+wandb
+tqdm
+numpy
+pyyaml
