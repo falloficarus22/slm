@@ -29,8 +29,8 @@ def encode_file(tokenizer: Tokenizer, inp: Path, out: Path):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--tokenizer", type=str, default="artifacts/tokenizer/tokenizer.json")
-    parser.add_argument("--in_dir", type=str, default="data/preprocessed")
-    parser.add_argument("--out_dir", type=str, default="data/tokenized")
+    parser.add_argument("--in-dir", type=str, default="data/processed")
+    parser.add_argument("--out-dir", type=str, default="data/tokenized")
     args = parser.parse_args()
 
     tok = Tokenizer.from_file(args.tokenizer)
@@ -38,7 +38,7 @@ def main():
     out_dir = Path(args.out_dir)
 
     for split in ("train", "val", "test"):
-        encode_file(tok, in_dir, f"{split}.jsonl", out_dir / f"{split}.bin")
+        encode_file(tok, in_dir / f"{split}.jsonl", out_dir / f"{split}.bin")
 
 
 if __name__ == "__main__":

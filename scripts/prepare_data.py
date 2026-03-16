@@ -37,14 +37,14 @@ def main():
     parser.add_argument("--out-dir", type=str, default="data/processed")
     args = parser.parse_args()
 
-    ds = load_dataset(args.dataset, args.config, split=args.split, streaming=False)
-    ds = ds.select(range(min(args.max_samples, len(ds))))
-
+    ds = load_dataset(args.dataset, args.config, split=args.split, streaming=True)
     texts = []
     for ex in ds:
-        t = to_unified_text(x)
-        if is_math_like(t):
+        t = to_unified_text(ex)
+        if is_math_like(ex):
             texts.append({"text": t})
+        if len(texts >= args.max_samples:
+            break)
 
     filtered = Dataset.from_list(texts).shuffle(seed=42)
     n = len(filtered)
