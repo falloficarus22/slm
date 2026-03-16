@@ -43,7 +43,7 @@ def main():
         t = to_unified_text(ex)
         if is_math_like(ex):
             texts.append({"text": t})
-        if len(texts >= args.max_samples):
+        if len(texts) >= args.max_samples:
             break
 
     filtered = Dataset.from_list(texts).shuffle(seed=42)
