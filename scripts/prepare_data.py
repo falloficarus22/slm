@@ -9,7 +9,7 @@ MATH_HINT_RE = re.compile(r"(\d|=|\+|-|\*|/|%|\bsolve\b|\bequation\b|\balgebra\b
 
 
 def is_math_like(text: str) -> bool:
-    if not text or len(text) < 40:
+    if not text or len(text) < 10:
         return False
     return bool(MATH_HINT_RE.search(text))
 
@@ -18,6 +18,7 @@ def to_unified_text(example: dict) -> str:
     for key in ("text", "content", "body", "question"):
         if key in example and isinstance(example[key], str):
             return example[key].strip()
+    print(f"Unrecognised keys: {list(example.keys())[:10]}")
     return ""
 
 
@@ -35,17 +36,28 @@ def main():
     parser.add_argument("--split", type=str, default="train")
     parser.add_argument("--max-samples", type=int, default=20000)
     parser.add_argument("--out-dir", type=str, default="data/processed")
+    parser.add_argument("--scan-limit", type=int, default=20000)
     args = parser.parse_args()
 
     ds = load_dataset(args.dataset, args.config, split=args.split, streaming=True)
     texts = []
+    scanned = 0
     for ex in ds:
+        scanned += 1
         t = to_unified_text(ex)
-        if is_math_like(ex):
+        if is_math_like(t):
             texts.append({"text": t})
-        if len(texts) >= args.max_samples:
+        if len(texts) >= args.max_samples or scanned >= args.scan_limit:
             break
+        if scanned % 500 == 0:
+            print(f"Scanned: {scanned}, kept: {len(texts)}")
 
+    if not texts:
+        raise RuntimeError(
+            "No math like samples were collected. "
+            "Check the dataset fields or relax the math filter."
+        )
+    
     filtered = Dataset.from_list(texts).shuffle(seed=42)
     n = len(filtered)
     n_train = int(0.8 * n)
