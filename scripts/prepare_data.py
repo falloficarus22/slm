@@ -5,7 +5,10 @@ from pathlib import Path
 
 from datasets import Dataset, load_dataset
 
-MATH_HINT_RE = re.compile(r"(\d|=|\+|-|\*|/|%|\bsolve\b|\bequation\b|\balgebra\b)", re.IGNORECASE)
+MATH_HINT_RE = re.compile(
+    r"(\bsolve\b|\bequation\b|\balgebra\b|\barithmetic\b|\bgeometry\b|\bfraction\b|\bpercentage\b|\binteger\b|\bcalculate\b|\bfind x\b|=|\+|\*|/)",
+    re.IGNORECASE,
+    )
 
 
 def is_math_like(text: str) -> bool:
@@ -47,10 +50,12 @@ def main():
         t = to_unified_text(ex)
         if is_math_like(t):
             texts.append({"text": t})
-        if len(texts) >= args.max_samples or scanned >= args.scan_limit:
-            break
+        if len(texts) <= 5:
+            print("KEPT SAMPLE:", t[:200].replace("\n", " "))
         if scanned % 500 == 0:
             print(f"Scanned: {scanned}, kept: {len(texts)}")
+        if len(texts) >= args.max_samples or scanned >= args.scan_limit:
+            break
 
     if not texts:
         raise RuntimeError(
