@@ -1,28 +1,20 @@
 import argparse
 import json
-import re
 from pathlib import Path
 
-from datasets import Dataset, load_dataset
+from datasets import load_dataset
 
-MATH_HINT_RE = re.compile(
-    r"(\bsolve\b|\bequation\b|\balgebra\b|\barithmetic\b|\bgeometry\b|\bfraction\b|\bpercentage\b|\binteger\b|\bcalculate\b|\bfind x\b|=|\+|\*|/)",
-    re.IGNORECASE,
+
+def format_gsm8k(example: dict) -> dict:
+    question = example["question"].strip()
+    answer = example["answer"].strip()
+    text = (
+        "### Problem:\n"
+        f"{question}\n\n"
+        "### Solution:\n"
+        f"{answer}\n"
     )
-
-
-def is_math_like(text: str) -> bool:
-    if not text or len(text) < 10:
-        return False
-    return bool(MATH_HINT_RE.search(text))
-
-
-def to_unified_text(example: dict) -> str:
-    for key in ("text", "content", "body", "question"):
-        if key in example and isinstance(example[key], str):
-            return example[key].strip()
-    print(f"Unrecognised keys: {list(example.keys())[:10]}")
-    return ""
+    return {"text": text}
 
 
 def write_jsonl(rows, out_path: Path):
@@ -34,53 +26,26 @@ def write_jsonl(rows, out_path: Path):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--dataset", type=str, default="HuggingFaceTB/smollm-corpus")
-    parser.add_argument("--config", type=str, default="cosmopedia-v2")
-    parser.add_argument("--split", type=str, default="train")
-    parser.add_argument("--max-samples", type=int, default=20000)
     parser.add_argument("--out-dir", type=str, default="data/processed")
-    parser.add_argument("--scan-limit", type=int, default=20000)
     args = parser.parse_args()
 
-    ds = load_dataset(args.dataset, args.config, split=args.split, streaming=True)
-    texts = []
-    scanned = 0
-    for ex in ds:
-        scanned += 1
-        t = to_unified_text(ex)
-        if is_math_like(t):
-            texts.append({"text": t})
-        if len(texts) <= 5:
-            print("KEPT SAMPLE:", t[:200].replace("\n", " "))
-        if scanned % 500 == 0:
-            print(f"Scanned: {scanned}, kept: {len(texts)}")
-        if len(texts) >= args.max_samples or scanned >= args.scan_limit:
-            break
+    train_ds = load_dataset("openai/gsm8k", "main", split="train")
+    test_ds = load_dataset("openai/gsm8k", "main", split="test")
 
-    if not texts:
-        raise RuntimeError(
-            "No math like samples were collected. "
-            "Check the dataset fields or relax the math filter."
-        )
-    
-    filtered = Dataset.from_list(texts).shuffle(seed=42)
-    n = len(filtered)
-    n_train = int(0.8 * n)
-    n_val = int(0.1 * n)
+    train_rows = [format_gsm8k(ex) for ex in train_ds]
+    test_rows = [format_gsm8k(ex) for ex in test_ds]
 
-    train_rows = filtered.select(range(0, n_train))
-    val_rows = filtered.select(range(n_train, n_train + n_val))
-    test_rows = filtered.select(range(n_train + n_val, n))
+    val_size = min(1000, max(1, len(train_rows) // 10))
+    val_rows = train_rows[:val_size]
+    final_train_rows = train_rows[val_size:]
 
     out_dir = Path(args.out_dir)
-    write_jsonl(train_rows, out_dir / "train.jsonl")
+    write_jsonl(final_train_rows, out_dir / "train.jsonl")
     write_jsonl(val_rows, out_dir / "val.jsonl")
     write_jsonl(test_rows, out_dir / "test.jsonl")
 
-    print(f"Filtered rows: {n}")
-    print(f"train={len(train_rows)} val={len(val_rows)} test={len(test_rows)}")
-    print(f"Wrote files to: {out_dir.resolve()}")
-
+    print(f"train={len(final_train_rows)} val={len(val_rows)} test={len(test_rows)}")
+    print(f"Wrote to: {out_dir.resolve()}")
 
 if __name__ == "__main__":
     main()
